@@ -57,7 +57,7 @@ def optimise(idx, shared_model, buffer, args, lock):
                     q_network.load_state_dict(shared_model.state_dict())
                 
                     # Calculate loss for the batch
-                    loss = calculate_loss(q_network, target_network, batch, args)
+                    loss = calculate_loss(q_network, target_network, batch, args,Device.get_device())
                 
                     # Optimise for the batch
                     loss = optimise_model(shared_model, q_network, loss, sgd, args, lock)

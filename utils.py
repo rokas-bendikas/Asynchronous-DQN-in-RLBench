@@ -24,7 +24,7 @@ def prepare_batch(buffer, batch_size):
 
 def prepare_batch(buffer,args,lock):
     
-    data = deque(maxlen=args.buffer_size)
+    data = []
     
     # The critical section begins
     lock.acquire()
@@ -39,6 +39,7 @@ def prepare_batch(buffer,args,lock):
     
     batch_size = min(buffer_size, args.batch_size)
     lock.release()
+    
     # The critical section ends
     
 

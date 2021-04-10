@@ -32,7 +32,7 @@ def explore(idx,SIMULATOR,model,buffer,args):
             n_gpu = t.cuda.device_count()
             if n_gpu > 0:
                 #Device.set_device(idx % n_gpu)
-                Device.set_device(0)
+                Device.set_device('cpu')
             
             
             for itr in tqdm(count(), position=idx, desc='explorer:{:02}'.format(idx)):
