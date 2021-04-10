@@ -4,12 +4,14 @@ import numpy as np
 
 
 def calculate_loss(q_network, target_network, batch, hyperparameters):
+    
     state, action, reward, next_state, terminal = batch
     
     with t.no_grad():
         target = reward + terminal * hyperparameters.gamma * target_network(next_state).max()
 
       
-    predicted = q_network(state).gather(1, action)
-
+    predicted = q_network(state)
+   
+    predicted = predicted[0,int(action[0])]
     return f.smooth_l1_loss(predicted, target)

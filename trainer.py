@@ -60,7 +60,7 @@ def main():
     workers_explore = [mp.Process(target=explore,args=(idx,SIMULATOR,model,buffer,args)) for idx in range(args.n_workers)]
     workers_explore.append(mp.Process(target=checkpoint, args=(model, args)))
     
-    workers_optimize = mp.Process(target=optimise,args=(1, model, buffer, args, lock))
+    workers_optimize = mp.Process(target=optimise,args=(0, model, buffer, args, lock))
    
     [p.start() for p in workers_explore]
     print("Succesfully started explorers!")

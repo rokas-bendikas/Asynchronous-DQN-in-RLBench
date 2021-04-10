@@ -29,24 +29,22 @@ def prepare_batch(buffer,args,lock):
     # The critical section begins
     lock.acquire()
     
+    buffer_size = buffer.qsize()
     
-    for i in range(buffer.qsize()):
+    for i in range(buffer_size):
         data_from_buffer = buffer.get()
         data_processed = buffer_to_data(data_from_buffer)
-        print(len(data_processed))
         data.append(data_processed)
         buffer.put(data_from_buffer)
     
-    batch_size = min(buffer.qsize(), args.batch_size)
+    batch_size = min(buffer_size, args.batch_size)
     lock.release()
     # The critical section ends
     
 
-    batch = random.sample(data, batch_size)[0]
+    batch = random.sample(data, batch_size)
     
-    print(batch_size)
-    print(len(batch))
-
+   
     states, actions, rewards, next_states, terminal = zip(*batch)
     
     return t.stack(states), t.stack(actions), t.stack(rewards), t.stack(next_states), t.stack(terminal)
@@ -74,6 +72,7 @@ def data_to_buffer(state, action, reward, next_state, terminal):
     next_state = as_tensor(next_state).unsqueeze(3)
     terminal = as_tensor([not terminal]).unsqueeze(1).unsqueeze(2).unsqueeze(3).expand(128, 128,3,1)
     
+
     
     data = t.cat((state,action,reward,next_state,terminal),dim=3)
     

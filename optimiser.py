@@ -29,7 +29,8 @@ def optimise(idx, shared_model, buffer, args, lock):
         # allocate a device
         n_gpu = t.cuda.device_count()
         if n_gpu > 0:
-            Device.set_device(idx % n_gpu)
+            #Device.set_device(idx % n_gpu)
+            Device.set_device(0)
     
         q_network = deepcopy(shared_model)
         q_network.to(Device.get_device())
@@ -39,7 +40,7 @@ def optimise(idx, shared_model, buffer, args, lock):
         target_network.to(Device.get_device())
         target_network.eval()
     
-        #buffer = deque(maxlen=args.buffer_size)
+
     
         for itr in tqdm(count(), position=idx, desc='optimiser:{:02}'.format(idx)):
     
@@ -49,13 +50,9 @@ def optimise(idx, shared_model, buffer, args, lock):
                 
                 
                     # Sample a data point from dataset
-                    batch = prepare_batch(buffer, args,lock)[0]
+                    batch = prepare_batch(buffer, args,lock)
                     
-                    
-                    
-                    #print(batch)
-                    #print(batch.shape)
-                
+                  
                     # Sync local model with shared model
                     q_network.load_state_dict(shared_model.state_dict())
                 

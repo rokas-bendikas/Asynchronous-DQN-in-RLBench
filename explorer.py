@@ -18,6 +18,7 @@ import torch.multiprocessing as mp
 
 import torch as t
 
+from device import Device
             
 def explore(idx,SIMULATOR,model,buffer,args):
         
@@ -26,6 +27,12 @@ def explore(idx,SIMULATOR,model,buffer,args):
             model.eval()
             
             simulator = SIMULATOR()
+            
+            # allocate a device
+            n_gpu = t.cuda.device_count()
+            if n_gpu > 0:
+                #Device.set_device(idx % n_gpu)
+                Device.set_device(0)
             
             
             for itr in tqdm(count(), position=idx, desc='explorer:{:02}'.format(idx)):
@@ -58,7 +65,6 @@ def explore(idx,SIMULATOR,model,buffer,args):
                     episode_reward += reward
                     state = next_state
                     
-                    #print(buffer.qsize())
                     
                     if terminal or (e>args.iter_length):
                         break
