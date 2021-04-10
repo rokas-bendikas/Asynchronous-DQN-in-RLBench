@@ -4,13 +4,15 @@ import torch as t
 
 from device import Device
 
+from collections import deque
+
 
 def copy_gradients(target, source):
     for shared_param, param in zip(target.parameters(), source.parameters()):
         if param.grad is not None:
             shared_param._grad = param.grad.clone().cpu()
 
-
+"""
 def prepare_batch(buffer, batch_size):
     batch_size = min(len(buffer), batch_size)
     batch = random.sample(buffer, batch_size)
@@ -18,12 +20,41 @@ def prepare_batch(buffer, batch_size):
     states, actions, rewards, next_states, terminal = zip(*batch)
 
     return t.stack(states), t.stack(actions), t.stack(rewards), t.stack(next_states), t.stack(terminal)
+"""
 
+def prepare_batch(buffer,args,lock):
+    
+    data = deque(maxlen=args.buffer_size)
+    
+    # The critical section begins
+    lock.acquire()
+    
+    
+    for i in range(buffer.qsize()):
+        data_from_buffer = buffer.get()
+        data_processed = buffer_to_data(data_from_buffer)
+        print(len(data_processed))
+        data.append(data_processed)
+        buffer.put(data_from_buffer)
+    
+    batch_size = min(buffer.qsize(), args.batch_size)
+    lock.release()
+    # The critical section ends
+    
+
+    batch = random.sample(data, batch_size)[0]
+    
+    print(batch_size)
+    print(len(batch))
+
+    states, actions, rewards, next_states, terminal = zip(*batch)
+    
+    return t.stack(states), t.stack(actions), t.stack(rewards), t.stack(next_states), t.stack(terminal)
 
 def as_tensor(x, dtype=t.float32):
     return t.tensor(x, dtype=dtype, device=Device.get_device())
 
-
+"""
 def transition_to_tensor(state, action, reward, next_state, terminal):
     
     
@@ -34,15 +65,33 @@ def transition_to_tensor(state, action, reward, next_state, terminal):
             as_tensor([not terminal]))
 
 """
-class Tensor_deque(t.Tensor):
-    def __init__(self,max_length):
-        self.max_length = max_length
-        self.storage = t.Tensor()
-        
-    def append(val):
-        if (len(self.storage)+1 > self.max_length):
-            
-            
-        else:
-            self.storage
-"""      
+
+def data_to_buffer(state, action, reward, next_state, terminal):
+    
+    state = as_tensor(state).unsqueeze(3)
+    action = as_tensor([action], t.long).unsqueeze(1).unsqueeze(2).unsqueeze(3).expand(128, 128,3,1)
+    reward = as_tensor([reward]).unsqueeze(1).unsqueeze(2).unsqueeze(3).expand(128, 128,3,1)
+    next_state = as_tensor(next_state).unsqueeze(3)
+    terminal = as_tensor([not terminal]).unsqueeze(1).unsqueeze(2).unsqueeze(3).expand(128, 128,3,1)
+    
+    
+    data = t.cat((state,action,reward,next_state,terminal),dim=3)
+    
+    
+    return data
+
+
+
+def buffer_to_data(data):
+    
+ 
+    
+    state = data[:,:,:,0]
+    action = data[0,0,0,1]
+    reward = data[0,0,0,2]
+    next_state = data[:,:,:,3]
+    terminal = data[0,0,0,4]
+
+    
+    
+    return (state,action,reward,next_state,terminal)

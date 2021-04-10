@@ -3,14 +3,19 @@ import os
 import shutil
 
 import torch.multiprocessing as mp
+from torch.multiprocessing import set_start_method
 
 from checkpoint import checkpoint
 from environments import environments
-from optimiser import optimiser
-from collections import deque
-#from multiprocessing import shared_memory
+from optimiser import optimise
+from explorer import explore
 
-if __name__ == '__main__':
+
+
+
+    
+    
+def main():
     os.environ['PYTHONWARNINGS'] = 'ignore:semaphore_tracker:UserWarning'
     mp.set_start_method('spawn', True)
 
@@ -22,7 +27,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--environment', default='RLBench', help='Environment to use for training [default = cartpole]')
+    parser.add_argument('--environment', default='RLBench', help='Environment to use for training [default = RLBench]')
     parser.add_argument('--save_model', default='', help='Path to save the model [default = '']')
     parser.add_argument('--load_model', default='', help='Path to load the model [default = '']')
     parser.add_argument('--n_workers', default=1, type=int, help='Number of workers [default = 1]')
@@ -45,28 +50,47 @@ if __name__ == '__main__':
     model = NETWORK()
     model.load(args.load_model)
     model.share_memory()
-    
-    #Create a shared memory instance
-    
-    #shm = shared_memory.SharedMemory(create=True, size=a.nbytes)
 
     lock = mp.Lock()
+    
+    buffer = mp.Queue(args.buffer_size)
+    
+    
+    
+    workers_explore = [mp.Process(target=explore,args=(idx,SIMULATOR,model,buffer,args)) for idx in range(args.n_workers)]
+    workers_explore.append(mp.Process(target=checkpoint, args=(model, args)))
+    
+    workers_optimize = mp.Process(target=optimise,args=(1, model, buffer, args, lock))
+   
+    [p.start() for p in workers_explore]
+    print("Succesfully started explorers!")
+    
+    workers_optimize.start()
+    print("Succesfully started optimisers!")
 
-    processes = [mp.Process(target=optimiser, args=(idx, model, SIMULATOR, args, lock)) for idx in range(args.n_workers)]
-    processes.append(mp.Process(target=checkpoint, args=(model, args)))
-
-    [p.start() for p in processes]
 
     try:
-        [p.join() for p in processes]
+        [p.join() for p in workers_explore]
+        print("Explorers joint!")
+        
+        workers_optimize.join()
+        print("Optimiser joint!")
+        
     except Exception as e:
         print(e)
     except KeyboardInterrupt:
         print('<< EXITING >>')
     finally:
-        [p.terminate() for p in processes]
+        [p.kill() for p in workers_explore]
+        workers_optimize.kill()
+        buffer.close()
         
+
         os.system('clear')
         if input('Save model? (y/n): ') in ['y', 'Y', 'yes']:
             print('<< SAVING MODEL >>')
-            model.save(argsn.save_model)
+            model.save(args.save_model)
+            
+            
+if __name__ == '__main__':
+    main()

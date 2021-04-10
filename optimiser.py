@@ -12,11 +12,11 @@ from tqdm import tqdm
 from calculate_loss import calculate_loss
 from device import Device
 from optimise_model import optimise_model
-from utils import prepare_batch, as_tensor, transition_to_tensor
+from utils import prepare_batch, as_tensor
 
 
 
-def optimiser(idx, shared_model, SIMULATOR, args, lock):
+def optimise(idx, shared_model, buffer, args, lock):
     try:
         writer = SummaryWriter('runs/{}/optimiser:{:02}'.format(datetime.now().strftime("%d|%m_%H|%M"), idx))
         logging.basicConfig(filename='logs/optimiser:{:02}.log'.format(idx),
@@ -39,60 +39,43 @@ def optimiser(idx, shared_model, SIMULATOR, args, lock):
         target_network.to(Device.get_device())
         target_network.eval()
     
-        buffer = deque(maxlen=args.buffer_size)
+        #buffer = deque(maxlen=args.buffer_size)
     
-        simulator = SIMULATOR()
         for itr in tqdm(count(), position=idx, desc='optimiser:{:02}'.format(idx)):
     
             
-            state = simulator.reset()
-            episode_reward = 0
             for e in count():
+                if(not buffer.empty()):
+                
+                
+                    # Sample a data point from dataset
+                    batch = prepare_batch(buffer, args,lock)[0]
                     
-                if np.random.RandomState().rand() < max(args.eps ** itr, args.min_eps):
-                    action = np.random.RandomState().randint(simulator.n_actions()-1)
-                else:
                     
-                    action = q_network(as_tensor(state)).argmax().item()
-                               
-                  
-                next_state, reward, terminal = simulator.step(action)
-                            
-                buffer.append(transition_to_tensor(state, action, reward, next_state, terminal))
+                    
+                    #print(batch)
+                    #print(batch.shape)
+                
+                    # Sync local model with shared model
+                    q_network.load_state_dict(shared_model.state_dict())
+                
+                    # Calculate loss for the batch
+                    loss = calculate_loss(q_network, target_network, batch, args)
+                
+                    # Optimise for the batch
+                    loss = optimise_model(shared_model, q_network, loss, sgd, args, lock)
+                
+                    # Log the results
+                    logging.debug('Batch loss: {:.2f}'.format(loss))
+                    writer.add_scalar('batch/loss', loss, e)
+                
+                     
+              
             
-                episode_reward += reward
-                state = next_state
-            
-                # Sample a data point from dataset
-                batch = prepare_batch(buffer, args.batch_size)
-            
-                # Sync local model with shared model
-                q_network.load_state_dict(shared_model.state_dict())
-            
-                # Calculate loss for the batch
-                loss = calculate_loss(q_network, target_network, batch, args)
-            
-                # Optimise for the batch
-                loss = optimise_model(shared_model, q_network, loss, sgd, args, lock)
-            
-                # Log the results
-                logging.debug('Batch loss: {:.2f}'.format(loss))
-                writer.add_scalar('batch/loss', loss, e)
-            
-                if terminal or (e>args.iter_length):
-                    break
-                        
-                       
-        
-            logging.debug('Episode reward: {:.2f}'.format(episode_reward))
-            writer.add_scalar('episode_reward', episode_reward, itr)
             writer.close()
         
             if itr % args.target_update_frequency == 0:
                 target_network.load_state_dict(q_network.state_dict())
             
-
     except KeyboardInterrupt:
         print('exiting optimiser:{:02}'.format(idx))
-        del simulator
-       
