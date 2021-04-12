@@ -33,23 +33,25 @@ def main():
     parser.add_argument('--n_workers', default=1, type=int, help='Number of workers [default = 1]')
     parser.add_argument('--target_update_frequency', default=10, type=int, help='Frequency for syncing target network [default = 10]')
     parser.add_argument('--checkpoint_frequency', default=10, type=int, help='Frequency for creating checkpoints [default = 10]')
-
-    parser.add_argument('--lr', default=0.0005, type=float, help='Learning rate for the training [default = 0.0005]')
-    parser.add_argument('--batch_size', default=32, type=int, help='Batch size for the training [default = 32]')
+    parser.add_argument('--lr', default=0.001, type=float, help='Learning rate for the training [default = 0.0005]')
+    parser.add_argument('--batch_size', default=128, type=int, help='Batch size for the training [default = 32]')
     parser.add_argument('--gamma', default=0.99, type=float, help='Discount factor for the training [default = 0.99]')
-    parser.add_argument('--eps', default=0.999, type=float, help='Greedy constant for the training [default = 0.999]')
+    parser.add_argument('--eps', default=0.995, type=float, help='Greedy constant for the training [default = 0.995]')
     parser.add_argument('--min_eps', default=0.1, type=float, help='Minimum value for greedy constant [default = 0.1]')
-    parser.add_argument('--buffer_size', default=100000, type=int, help='Buffer size [default = 100000]')
+    parser.add_argument('--buffer_size', default=10000, type=int, help='Buffer size [default = 1000]')
     parser.add_argument('--max_grad_norm', default=10, type=float, help='Maximum value of L2 norm for gradients [default = 10]')
-    parser.add_argument('--iter_length', default=100, type=int, help='Maximum number of iterations [default=100]')
+    parser.add_argument('--episode_length', default=2500, type=int, help='Episode length [default=2500]')
+    parser.add_argument('--headless', default=False, type=bool, help='Run simulation headless [default=False]')
+    
+    
 
     args = parser.parse_args()
     
 
     SIMULATOR, NETWORK = environments[args.environment]
-    model = NETWORK()
-    model.load(args.load_model)
-    model.share_memory()
+    model_shared = NETWORK(args)
+    model_shared.load(args.load_model)
+    model_shared.share_memory()
 
     lock = mp.Lock()
     
@@ -57,24 +59,18 @@ def main():
     
     
     
-    workers_explore = [mp.Process(target=explore,args=(idx,SIMULATOR,model,buffer,args)) for idx in range(args.n_workers)]
-    workers_explore.append(mp.Process(target=checkpoint, args=(model, args)))
-    
-    workers_optimize = mp.Process(target=optimise,args=(0, model, buffer, args, lock))
+    workers_explore = [mp.Process(target=explore,args=(idx,SIMULATOR,model_shared,buffer,args)) for idx in range(args.n_workers)]
+    workers_explore.append(mp.Process(target=optimise,args=(args.n_workers, model_shared, buffer, args, lock)))
+    workers_explore.append(mp.Process(target=checkpoint, args=(model_shared, args)))
    
     [p.start() for p in workers_explore]
-    print("Succesfully started explorers!")
+    print("Succesfully started workers!")
     
-    workers_optimize.start()
-    print("Succesfully started optimisers!")
-
+    
 
     try:
         [p.join() for p in workers_explore]
-        print("Explorers joint!")
         
-        workers_optimize.join()
-        print("Optimiser joint!")
         
     except Exception as e:
         print(e)
@@ -82,14 +78,15 @@ def main():
         print('<< EXITING >>')
     finally:
         [p.kill() for p in workers_explore]
-        workers_optimize.kill()
+        #workers_optimize.kill()
+        #check.terminate()
         buffer.close()
         
 
         os.system('clear')
         if input('Save model? (y/n): ') in ['y', 'Y', 'yes']:
             print('<< SAVING MODEL >>')
-            model.save(args.save_model)
+            model_shared.save(args.save_model)
             
             
 if __name__ == '__main__':

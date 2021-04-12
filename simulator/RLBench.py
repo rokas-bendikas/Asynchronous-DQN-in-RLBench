@@ -8,15 +8,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+
 class RLBench(BaseSimulator):
-    def __init__(self):
+    def __init__(self,h):
         
         obs_config = ObservationConfig()
         obs_config.set_all(True)
         
         action_mode = ActionMode(ArmActionMode.ABS_JOINT_VELOCITY)
         self.env = Environment(
-            action_mode, obs_config=obs_config, headless=False)
+            action_mode, obs_config=obs_config, headless=h)
         self.env.launch()
         
         self.task = self.env.get_task(ReachTarget)
@@ -25,7 +26,10 @@ class RLBench(BaseSimulator):
 
     def reset(self):
         d, o = self.task.reset()
-        return o.front_rgb
+        
+        state = np.concatenate((o.front_rgb, o.left_shoulder_rgb,o.right_shoulder_rgb,o.wrist_rgb),axis=2)
+        
+        return state
 
     def step(self, action):
         
@@ -41,12 +45,16 @@ class RLBench(BaseSimulator):
             
         s, r, t = self.task.step(action_onehot)
         
+       
         
-        return s.front_rgb, r, t
+        state = np.concatenate((s.front_rgb, s.left_shoulder_rgb,s.right_shoulder_rgb,s.wrist_rgb),axis=2)
+        
+        
+        return state, r, t
 
     @staticmethod
     def n_actions():
-        return 16
+        return 12
     
     def shutdown(self):
         print("Shutdown")
