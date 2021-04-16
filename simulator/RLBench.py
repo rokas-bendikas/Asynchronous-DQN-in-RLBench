@@ -2,20 +2,22 @@ from simulator.base import BaseSimulator
 
 from rlbench.environment import Environment
 from rlbench.action_modes import ArmActionMode, ActionMode
-from rlbench.observation_config import ObservationConfig
+from rlbench.observation_config import ObservationConfig, CameraConfig
 from rlbench.tasks import ReachTarget
 import numpy as np
-import matplotlib.pyplot as plt
+from pyquaternion import Quaternion
 
 
 
 class RLBench(BaseSimulator):
     def __init__(self,h):
         
-        obs_config = ObservationConfig()
+        cam = CameraConfig(image_size=(64, 64))
+        
+        obs_config = ObservationConfig(left_shoulder_camera=cam,right_shoulder_camera=cam,wrist_camera=cam,front_camera=cam)
         obs_config.set_all(True)
         
-        action_mode = ActionMode(ArmActionMode.ABS_JOINT_VELOCITY)
+        action_mode = ActionMode(ArmActionMode.DELTA_EE_POSE_WORLD_FRAME)
         self.env = Environment(
             action_mode, obs_config=obs_config, headless=h)
         self.env.launch()
@@ -31,19 +33,66 @@ class RLBench(BaseSimulator):
         
         return state
 
-    def step(self, action):
+    def step(self, a):
         
-        action_onehot = np.zeros(8)
         
-        if(action%2==0):
-            a = int(action/2)
-            action_onehot[a] = 1
+        action = np.zeros(8)
+        
+        qt = Quaternion(1,0,0,0)
+        action[3] = qt[0]
+        action[4] = qt[1]
+        action[5] = qt[2]
+        action[6] = qt[3]
+        
+        
+        # For positive values
+        if(a%2==0):
+            a = int(a/2)
+            print(a)
+            if ((a==0) or (a==1) or (a== 2)):
+                action[a] = 0.01
+            else:
+                axis = [0,0,0]
+                axis[a-3] = 1
+                #qt = Quaternion(axis=axis,angle=0.00000000175)
+                action[3] = qt[0]
+                action[4] = qt[1]
+                action[5] = qt[2]
+                action[6] = qt[3]
+            
+        
+        # For negative values
+        else:
+            a = int((a-1)/2)
+            print(a)
+            if ((a==0) or (a==1) or (a== 2)):
+                action[a] = -0.01
+            else:
+                axis = [0,0,0]
+                axis[a-3] = 1
+                #qt = Quaternion(axis=axis,angle=0.00000000175)
+                action[3] = qt[0]
+                action[4] = qt[1]
+                action[5] = qt[2]
+                action[6] = qt[3]
+               
+        
+        
+        """
+        action = np.zeros(8)
+        
+        if(a%2==0):
+            a = int(a/2)
+            action[a] = 1
             
         else:
-            a = int((action-1)/2)
-            action_onehot[a] = -1
+            a = int((a-1)/2)
+            action[a] = -1
             
-        s, r, t = self.task.step(action_onehot)
+        """
+        
+            
+        s, r, t = self.task.step(action)
         
        
         
@@ -54,7 +103,7 @@ class RLBench(BaseSimulator):
 
     @staticmethod
     def n_actions():
-        return 12
+        return 14
     
     def shutdown(self):
         print("Shutdown")

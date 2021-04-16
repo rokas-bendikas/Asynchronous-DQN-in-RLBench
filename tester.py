@@ -7,7 +7,7 @@ from performer import performer
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--environment', default='cartpole', help='Environment to use for training [default = cartpole]')
+    parser.add_argument('--environment', default='RLBench', help='Environment to use for training [default = RLBench]')
     parser.add_argument('--load_model', default='', help='Path to load the model [default = '']')
     args = parser.parse_args()
 
