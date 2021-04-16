@@ -32,11 +32,11 @@ def main():
     parser.add_argument('--lr', default=6e-6, type=float, help='Learning rate for the training [default = 0.0005]')
     parser.add_argument('--batch_size', default=128, type=int, help='Batch size for the training [default = 32]')
     parser.add_argument('--gamma', default=0.99, type=float, help='Discount factor for the training [default = 0.99]')
-    parser.add_argument('--eps', default=0.9985, type=float, help='Greedy constant for the training [default = 0.999]')
+    parser.add_argument('--eps', default=0.9985, type=float, help='Greedy constant for the training [default = 0.9985]')
     parser.add_argument('--min_eps', default=0.1, type=float, help='Minimum value for greedy constant [default = 0.1]')
-    parser.add_argument('--buffer_size', default=30000, type=int, help='Buffer size [default = 15000]')
+    parser.add_argument('--buffer_size', default=25000, type=int, help='Buffer size [default = 15000]')
     parser.add_argument('--max_grad_norm', default=10, type=float, help='Maximum value of L2 norm for gradients [default = 10]')
-    parser.add_argument('--episode_length', default=900, type=int, help='Episode length [default=1000]')
+    parser.add_argument('--episode_length', default=1000, type=int, help='Episode length [default=1000]')
     parser.add_argument('--headless', default=False, type=bool, help='Run simulation headless [default=False]')
     
     

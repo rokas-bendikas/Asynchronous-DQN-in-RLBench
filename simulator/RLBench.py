@@ -4,8 +4,33 @@ from rlbench.environment import Environment
 from rlbench.action_modes import ArmActionMode, ActionMode
 from rlbench.observation_config import ObservationConfig, CameraConfig
 from rlbench.tasks import ReachTarget
+from rlbench.task_environment import InvalidActionError
+
 import numpy as np
-from pyquaternion import Quaternion
+
+
+def normalize_action(action: np.ndarray,task):
+       
+    
+        [ax, ay, az] = action[:3]
+        x, y, z, qx, qy, qz, qw = task._robot.arm.get_tip().get_pose()
+        
+
+        # position
+        d_pos = np.array([ax, ay, az])
+        #d_pos /= (np.linalg.norm(d_pos) * 100.0)
+
+        # orientation
+        d_quat = np.array([0, 0, 0, 1.0])
+
+        # gripper_open = action[-1]
+        gripper_open = 1.0
+
+    
+        action = np.concatenate([d_pos, d_quat, [gripper_open]])
+
+            
+        return action
 
 
 
@@ -33,77 +58,46 @@ class RLBench(BaseSimulator):
         
         return state
 
-    def step(self, a):
+    def step(self, a, prev_state):
         
         
-        action = np.zeros(8)
+        # orientation
+        d_quat = np.array([0, 0, 0, 1])
         
-        qt = Quaternion(1,0,0,0)
-        action[3] = qt[0]
-        action[4] = qt[1]
-        action[5] = qt[2]
-        action[6] = qt[3]
+        # gripper_open = action[-1]
+        gripper_open = 1.0
         
+        d_pos = np.zeros(3)
         
         # For positive values
         if(a%2==0):
             a = int(a/2)
-            print(a)
-            if ((a==0) or (a==1) or (a== 2)):
-                action[a] = 0.01
-            else:
-                axis = [0,0,0]
-                axis[a-3] = 1
-                #qt = Quaternion(axis=axis,angle=0.00000000175)
-                action[3] = qt[0]
-                action[4] = qt[1]
-                action[5] = qt[2]
-                action[6] = qt[3]
+            d_pos[a] = 0.0225
             
-        
         # For negative values
         else:
             a = int((a-1)/2)
-            print(a)
-            if ((a==0) or (a==1) or (a== 2)):
-                action[a] = -0.01
-            else:
-                axis = [0,0,0]
-                axis[a-3] = 1
-                #qt = Quaternion(axis=axis,angle=0.00000000175)
-                action[3] = qt[0]
-                action[4] = qt[1]
-                action[5] = qt[2]
-                action[6] = qt[3]
-               
-        
-        
-        """
-        action = np.zeros(8)
-        
-        if(a%2==0):
-            a = int(a/2)
-            action[a] = 1
+            d_pos[a] = -0.0225
             
-        else:
-            a = int((a-1)/2)
-            action[a] = -1
+        action = np.concatenate([d_pos, d_quat, [gripper_open]])
+    
+        try:
             
-        """
-        
+            s, r, t = self.task.step(action)
+            state = np.concatenate((s.front_rgb, s.left_shoulder_rgb,s.right_shoulder_rgb,s.wrist_rgb),axis=2)
             
-        s, r, t = self.task.step(action)
+        except InvalidActionError:
+            state = prev_state
+            r = -0.001
+            t = False
         
-       
-        
-        state = np.concatenate((s.front_rgb, s.left_shoulder_rgb,s.right_shoulder_rgb,s.wrist_rgb),axis=2)
-        
+
         
         return state, r, t
 
     @staticmethod
     def n_actions():
-        return 14
+        return 6
     
     def shutdown(self):
         print("Shutdown")

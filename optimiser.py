@@ -1,11 +1,8 @@
 import logging
-from collections import deque
 from copy import deepcopy
 from datetime import datetime
 from itertools import count
-import time
 
-import numpy as np
 import torch as t
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm

@@ -51,12 +51,13 @@ def explore(idx,SIMULATOR,model,queue,args):
                 
                 for e in count():
                     
+                    
                     if (idx==0):
                         val = max(args.eps ** itr, args.min_eps)
                         eps = math.ceil(val / 0.1) * 0.1
                     else:
                         eps = max(args.eps ** itr, args.min_eps)
-                        
+                    
                     
                     
                     if np.random.RandomState().rand() < eps:
@@ -67,17 +68,15 @@ def explore(idx,SIMULATOR,model,queue,args):
                         action = model(as_tensor(state)).argmax().item()
                         
                                                               
-                          
-                    next_state, reward, terminal = simulator.step(action)
-                    
-                    reward *= 200
-                    
                         
-                    data_to_queue(state, action, reward, next_state, terminal,queue)
+                    next_state, reward, terminal = simulator.step(action,state)
+                        
+                    reward *= 200
+                        
+                 
+                    data = data_to_queue(state, action, reward, next_state, terminal)
 
-                
-                    #queue.put(data)
-                    
+                    queue.put(data)
         
                     episode_reward += reward
                     state = next_state
