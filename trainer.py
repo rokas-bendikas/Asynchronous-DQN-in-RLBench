@@ -24,20 +24,22 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--environment', default='RLBench', help='Environment to use for training [default = RLBench]')
-    parser.add_argument('--save_model', default='./model.model', help='Path to save the model [default = '']')
+    parser.add_argument('--save_model', default='./model.model', help='Path to save the model [default = "./model.model"]')
     parser.add_argument('--load_model', default='', help='Path to load the model [default = '']')
     parser.add_argument('--n_workers', default=1, type=int, help='Number of workers [default = 1]')
-    parser.add_argument('--target_update_frequency', default=10, type=int, help='Frequency for syncing target network [default = 10]')
+    parser.add_argument('--target_update_frequency', default=100, type=int, help='Frequency for syncing target network [default = 100]')
     parser.add_argument('--checkpoint_frequency', default=30, type=int, help='Frequency for creating checkpoints [default = 30]')
-    parser.add_argument('--lr', default=6e-6, type=float, help='Learning rate for the training [default = 0.0005]')
-    parser.add_argument('--batch_size', default=128, type=int, help='Batch size for the training [default = 32]')
+    parser.add_argument('--lr', default=1e-6, type=float, help='Learning rate for the training [default = 1e-6]')
+    parser.add_argument('--batch_size', default=64, type=int, help='Batch size for the training [default = 64]')
     parser.add_argument('--gamma', default=0.99, type=float, help='Discount factor for the training [default = 0.99]')
-    parser.add_argument('--eps', default=0.9985, type=float, help='Greedy constant for the training [default = 0.9985]')
+    parser.add_argument('--eps', default=0.997, type=float, help='Greedy constant for the training [default = 0.997]')
     parser.add_argument('--min_eps', default=0.1, type=float, help='Minimum value for greedy constant [default = 0.1]')
-    parser.add_argument('--buffer_size', default=25000, type=int, help='Buffer size [default = 15000]')
-    parser.add_argument('--max_grad_norm', default=10, type=float, help='Maximum value of L2 norm for gradients [default = 10]')
-    parser.add_argument('--episode_length', default=1000, type=int, help='Episode length [default=1000]')
+    parser.add_argument('--buffer_size', default=200000, type=int, help='Buffer size [default = 200000]')
+    parser.add_argument('--episode_length', default=900, type=int, help='Episode length [default=900]')
     parser.add_argument('--headless', default=False, type=bool, help='Run simulation headless [default=False]')
+    parser.add_argument('--advance_iteration', default=0, type=int, help='By how many iteration extended eps decay [default=0]')
+    parser.add_argument('--warmup', default=100, type=int, help='How many full exploration iterations [default=100]')
+    
     
     
 
@@ -57,7 +59,7 @@ def main():
     
     
     # Workers
-    workers_explore = [mp.Process(target=explore,args=(idx,SIMULATOR,model_shared,queues[idx],args)) for idx in range(args.n_workers)]
+    workers_explore = [mp.Process(target=explore,args=(idx,SIMULATOR,model_shared,queues[idx],args,lock)) for idx in range(args.n_workers)]
     workers_explore.append(mp.Process(target=optimise,args=(args.n_workers, model_shared, queues, args, lock)))
     workers_explore.append(mp.Process(target=checkpoint, args=(model_shared, args)))
     

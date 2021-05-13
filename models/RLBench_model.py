@@ -10,7 +10,7 @@ class RLBenchModel(BaseModel):
         
 
         self.network = nn.Sequential(
-            nn.Conv2d(in_channels=12,out_channels=32,kernel_size=5,padding=2),
+            nn.Conv2d(in_channels=6,out_channels=32,kernel_size=5,padding=2),
             nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
@@ -25,11 +25,8 @@ class RLBenchModel(BaseModel):
             nn.Flatten(),
             nn.Linear(4096, out_features=256), 
             nn.ReLU(),
-            nn.Linear(256, out_features=6), 
-        )
-        
-        
-        
+            nn.Linear(256, out_features=6))
+                  
 
     def forward(self,x):
         

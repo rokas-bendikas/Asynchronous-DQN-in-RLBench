@@ -5,96 +5,121 @@ from rlbench.action_modes import ArmActionMode, ActionMode
 from rlbench.observation_config import ObservationConfig, CameraConfig
 from rlbench.tasks import ReachTarget
 from rlbench.task_environment import InvalidActionError
+from pyrep.errors import ConfigurationPathError
 
 import numpy as np
-
-
-def normalize_action(action: np.ndarray,task):
-       
-    
-        [ax, ay, az] = action[:3]
-        x, y, z, qx, qy, qz, qw = task._robot.arm.get_tip().get_pose()
-        
-
-        # position
-        d_pos = np.array([ax, ay, az])
-        #d_pos /= (np.linalg.norm(d_pos) * 100.0)
-
-        # orientation
-        d_quat = np.array([0, 0, 0, 1.0])
-
-        # gripper_open = action[-1]
-        gripper_open = 1.0
-
-    
-        action = np.concatenate([d_pos, d_quat, [gripper_open]])
-
-            
-        return action
-
-
 
 class RLBench(BaseSimulator):
     def __init__(self,h):
         
+        #64x64 camera outputs
         cam = CameraConfig(image_size=(64, 64))
-        
         obs_config = ObservationConfig(left_shoulder_camera=cam,right_shoulder_camera=cam,wrist_camera=cam,front_camera=cam)
         obs_config.set_all(True)
         
-        action_mode = ActionMode(ArmActionMode.DELTA_EE_POSE_WORLD_FRAME)
-        self.env = Environment(
-            action_mode, obs_config=obs_config, headless=h)
-        self.env.launch()
+        # delta EE control with motion planning
+        action_mode = ActionMode(ArmActionMode.DELTA_EE_POSE_PLAN_WORLD_FRAME)
         
+        #Inits
+        self.env = Environment(action_mode, obs_config=obs_config, headless=h)
+        self.env.launch()
         self.task = self.env.get_task(ReachTarget)
         
 
 
     def reset(self):
+        
         d, o = self.task.reset()
         
-        state = np.concatenate((o.front_rgb, o.left_shoulder_rgb,o.right_shoulder_rgb,o.wrist_rgb),axis=2)
-        
-        return state
+        return o
 
     def step(self, a, prev_state):
         
         
-        # orientation
+        # delta orientation
         d_quat = np.array([0, 0, 0, 1])
         
-        # gripper_open = action[-1]
+        # gripper state
         gripper_open = 1.0
         
+        # delta position
         d_pos = np.zeros(3)
         
-        # For positive values
+        # For positive magnitude
         if(a%2==0):
             a = int(a/2)
-            d_pos[a] = 0.0225
+            d_pos[a] = 0.03
             
-        # For negative values
+        # For negative magnitude
         else:
             a = int((a-1)/2)
-            d_pos[a] = -0.0225
-            
+            d_pos[a] = -0.03
+        
+        # Forming action as expected by the environment
         action = np.concatenate([d_pos, d_quat, [gripper_open]])
     
         try:
-            
             s, r, t = self.task.step(action)
-            state = np.concatenate((s.front_rgb, s.left_shoulder_rgb,s.right_shoulder_rgb,s.wrist_rgb),axis=2)
-            
-        except InvalidActionError:
-            state = prev_state
-            r = -0.001
+            r*=1000
+        
+        # Handling failure in planning
+        except ConfigurationPathError:
+            s = prev_state
+            r = -0.1
             t = False
         
-
+        # Handling wrong action for inverse Jacobian
+        except InvalidActionError:
+            s = prev_state
+            r = -0.01
+            t = False
+            
         
-        return state, r, t
+        
+        # Get bounding box centroids
+        x, y, z = self.task._scene._workspace.get_position()
+        
+        # Set bounding box limits
+        minx = x - 0.25
+        maxx = x + 0.25
+        miny = y - 0.35
+        maxy = y + 0.35
+        minz = z
+        maxz = z + 0.5  
+        
+        bounding_box = [minx,maxx,miny,maxy,minz,maxz]
+        
+        # Get gripper position
+        gripper_pose = s.gripper_pose
+        
+        
+        # Reward for being in the bounding box
+        if (self.bb_check(bounding_box,gripper_pose)):
+            r += 0.1
+        
 
+        return s, r, t
+    
+    
+    # Check if gripper in the bounding box
+    def bb_check(self,bounding_box,gripper_pose):
+        
+        out = True
+        
+        if(gripper_pose[0] < bounding_box[0] or gripper_pose[0] > bounding_box[1]):
+            out = False
+            
+        if(gripper_pose[1] < bounding_box[2] or gripper_pose[1] > bounding_box[3]):
+            out = False
+            
+        if(gripper_pose[2] < bounding_box[4] or gripper_pose[2] > bounding_box[5]):
+            out = False
+        
+        
+        return out
+    
+    
+    
     @staticmethod
     def n_actions():
         return 6

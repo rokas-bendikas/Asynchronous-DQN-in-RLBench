@@ -1,12 +1,9 @@
 import logging
 from copy import deepcopy
-from datetime import datetime
 from itertools import count
-
 import torch as t
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
 from calculate_loss import calculate_loss
 from device import Device
 from optimise_model import optimise_model
@@ -15,15 +12,16 @@ from utils import ReplayBuffer
 t.multiprocessing.set_sharing_strategy('file_system')
 
 
-
 def optimise(idx, shared_model, queues, args, lock):
     try:
-        writer = SummaryWriter('runs/{}/optimiser:{:02}'.format(datetime.now().strftime("%d|%m_%H|%M"), idx))
+        
+        writer = SummaryWriter('runs/o{}'.format(idx))
+        
         logging.basicConfig(filename='logs/optimiser:{:02}.log'.format(idx),
                                 filemode='w',
                                 format='%(message)s',
                                 level=logging.DEBUG)
-    
+        
         sgd = t.optim.Adam(params=shared_model.parameters(), lr=args.lr)
     
         # allocate a device
@@ -47,15 +45,15 @@ def optimise(idx, shared_model, queues, args, lock):
     
             
                 
-            buffer.load_queues(queues,q_network,target_network)
+            buffer.load_queues(queues,q_network,target_network,lock,args)
             
-            while(len(buffer)<1):
-                buffer.load_queues(queues,q_network,target_network)
+            while(len(buffer) < min(args.n_workers*args.episode_length*args.warmup,args.buffer_size/2)):
+                buffer.load_queues(queues,q_network,target_network,lock,args)
                 continue
                 
                 
             # Sample a data point from dataset
-            batch = buffer.prepare_batch()
+            batch = buffer.prepare_batch(target_network,q_network)
                   
             # Sync local model with shared model
             q_network.load_state_dict(shared_model.state_dict())
@@ -68,7 +66,7 @@ def optimise(idx, shared_model, queues, args, lock):
                 
             # Log the results
             logging.debug('Batch loss: {:.2f}, Buffer size: {}'.format(loss,len(buffer)))
-            writer.add_scalar('batch/loss', loss,itr)
+            writer.add_scalar('Batch loss', loss,itr)
                 
             if itr % args.target_update_frequency == 0:
                 target_network.load_state_dict(q_network.state_dict())
